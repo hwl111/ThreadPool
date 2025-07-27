@@ -9,12 +9,131 @@
 #include<condition_variable>
 #include<functional>
 
+
+//Task类型的前置声明
+class Task;
+
+//Any类型:表示可以接收任意数据的类型
+class Any
+{
+public:
+	Any() = default;
+	~Any() = default;
+	Any(const Any&) = delete;
+	Any& operator = (const Any&) = delete;
+	Any(Any&&) = default;
+	Any& operator=(Any&&) = default;
+
+	//这个构造函数让Any类型接收任意的数据
+	template<typename T>
+	Any(T data) :base_(std::make_unique<Derive<T>>(data))
+	{}
+
+	//这个方法能把Any对象存储的data数据提取出来
+	template<typename T>
+	T cast_()
+	{
+		//从base_找到他所指向的派生对象，提取data成员变量
+		//基类指针---》派生指针 RTTI
+		Derive<T> *pd = dynamic_cast<Derive<T>*>(base_.get());
+		if (pd == nullptr)
+		{
+			throw "type is unmatch!!!";
+		}
+		return pd->data_;
+	}
+
+private:
+	//基类类型
+	class Base
+	{
+	public:
+		virtual ~Base() = default;
+	};
+
+	//派生类类型
+	template<typename T>
+	class Derive :public Base
+	{
+	public:
+		Derive(T data):data_(data)
+		{}
+
+		T data_;  //保存任意的其他类型
+	};
+private:
+	//定义一个基类指针
+	std::unique_ptr<Base> base_;
+};
+
+//实现一个信号量类
+class Semaphore
+{
+public:
+	Semaphore(int limit=0)
+		:resLimit_(limit)
+	{}
+	~Semaphore() = default;
+
+	//获取一个信号量资源
+	void wait()
+	{
+		std::unique_lock<std::mutex>lock(mtx_);
+		//等待信号量资源,没有资源会阻塞当前进程
+		cond_.wait(lock, [&]()->bool {return resLimit_ > 0; });
+		resLimit_--;
+	}
+
+	//增加一个信号量资源
+	void post()
+	{
+		std::unique_lock<std::mutex>lock(mtx_);
+		resLimit_++;
+		cond_.notify_all();
+	}
+
+private:
+	int resLimit_;
+	std::mutex mtx_;
+	std::condition_variable cond_;
+};
+
+
+//实现接收提交线程池的task任务执行完后的返回值Result
+class Result
+{
+public:
+	Result(std::shared_ptr<Task>task, bool isValid = true);
+	~Result() = default;
+
+	//setVal方法,获取任务执行完的返回值
+	void setVal(Any any);
+
+	//get方法，用户调用这个方法获取task的返回值
+	Any get();
+
+private:
+	Any any_;   //存储任务的返回值
+	Semaphore sem_;    //线程通信信号量
+	std::shared_ptr<Task>task_;   //指向对应获取任务的返回对象
+	std::atomic_bool isValid_;    //返回是否有效
+
+
+};
+
+
 // 任务抽象基类
 // 用户可以自定义任务类型,从Task继承，重写run方法，实现任务自定义处理
 class Task
 {
 public:
-	virtual void run() = 0;
+	Task();
+	~Task() = default;
+	void exec();
+	void setResult(Result* res);
+	virtual Any run() = 0;
+private:
+	Result* result_;   // Result对象生命周期长于Task
 };
 
 
@@ -73,7 +192,7 @@ public:
 	void setTaskQueMaxThreshHold(int threshhold);
 
 	//给线程池提交任务
-	void submitTask(std::shared_ptr<Task> sp);
+	Result submitTask(std::shared_ptr<Task> sp);
 
 	//开启线程
 	void start(int initThreadSize = 4);
