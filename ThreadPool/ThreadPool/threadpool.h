@@ -45,7 +45,19 @@ private:
 
 };
 
+/*
+exampl:
+ThreadPool pool;
+pool.stzrt(4);
 
+class MyTask : public Task
+{
+	public:
+		void run{// 编写代码}
+};
+pool.submitTask(std::make_shared<MyTask>());
+
+*/
 
 //线程池类
 class ThreadPool
@@ -61,7 +73,7 @@ public:
 	void setTaskQueMaxThreshHold(int threshhold);
 
 	//给线程池提交任务
-	void subnitTask(std::shared_ptr<Task> sp);
+	void submitTask(std::shared_ptr<Task> sp);
 
 	//开启线程
 	void start(int initThreadSize = 4);
@@ -74,7 +86,7 @@ private:
 	void threadFunc();
 
 private:
-	std::vector<Thread*> threads_;   //线程列表
+	std::vector<std::unique_ptr<Thread>> threads_;   //线程列表
 	size_t initThreadSize_;          //初始的线程数量
 
 	std::queue<std::shared_ptr<Task>>taskQue_;  //任务队列 
