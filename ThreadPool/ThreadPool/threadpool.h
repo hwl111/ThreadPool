@@ -9,7 +9,7 @@
 #include<condition_variable>
 #include<functional>
 #include<unordered_map>
-
+#include<thread>
 //Task类型的前置声明
 class Task;
 
@@ -72,12 +72,20 @@ class Semaphore
 public:
 	Semaphore(int limit=0)
 		:resLimit_(limit)
+		,isExit_(false)
 	{}
-	~Semaphore() = default;
+	~Semaphore()
+	{
+		isExit_ = true;
+	}
 
 	//获取一个信号量资源
 	void wait()
 	{
+		if (isExit_)
+		{
+			return;   //防止在linux下阻塞
+		}
 		std::unique_lock<std::mutex>lock(mtx_);
 		//等待信号量资源,没有资源会阻塞当前进程
 		cond_.wait(lock, [&]()->bool {return resLimit_ > 0; });
@@ -87,12 +95,19 @@ public:
 	//增加一个信号量资源
 	void post()
 	{
+		if (isExit_)
+		{
+			return;   //防止在linux下阻塞
+		}
 		std::unique_lock<std::mutex>lock(mtx_);
 		resLimit_++;
+		//linux下condition_variable的析构函数什么都没做
+		//导致这里状态失效,无故阻塞
 		cond_.notify_all();
 	}
 
 private:
+	std::atomic_bool isExit_;
 	int resLimit_;
 	std::mutex mtx_;
 	std::condition_variable cond_;
@@ -103,6 +118,11 @@ private:
 class Result
 {
 public:
+	Result(Result&&) = default;
+	Result& operator=(Result&&) = default;
+	Result(const Result&) = delete;
+	Result& operator=(const Result&) = delete;
+
 	Result(std::shared_ptr<Task>task, bool isValid = true);
 	~Result() = default;
 
@@ -203,7 +223,7 @@ public:
 	Result submitTask(std::shared_ptr<Task> sp);
 
 	//开启线程
-	void start(int initThreadSize = 4);
+	void start(int initThreadSize = std::thread::hardware_concurrency());
 
 	ThreadPool(const ThreadPool&) = delete;
 	ThreadPool& operator=(const ThreadPool) = delete;
@@ -233,6 +253,7 @@ private:
 	std::mutex taskQueMtx_;                     //保证任务队列安全
 	std::condition_variable notFull_;   //任务队列不满
 	std::condition_variable notEmpty_;  //任务队列不空
+	std::condition_variable exitCond_;  //等待线程资源全部回收
 
 	PoolMode poolMode_;                 //当前线程池的工作模式
 

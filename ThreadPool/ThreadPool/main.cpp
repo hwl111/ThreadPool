@@ -51,31 +51,49 @@ private:
 
 int main()
 {
-	ThreadPool pool;
+	{
+		ThreadPool pool;
+		pool.setMode(PoolMode::MODE_CACHED);
+		pool.start(2);
+		Result res1 = pool.submitTask(std::make_shared<MyTask>(1, 10000000));
+		Result res2 = pool.submitTask(std::make_shared<MyTask>(10000001, 20000000));
+		Result res3 = pool.submitTask(std::make_shared<MyTask>(20000001, 30000000));
+		Result res4 = pool.submitTask(std::make_shared<MyTask>(1, 10000000));
+		Result res5 = pool.submitTask(std::make_shared<MyTask>(10000001, 20000000));
+		Result res6 = pool.submitTask(std::make_shared<MyTask>(20000001, 30000000));
+		ULong sum1 = res1.get().cast_<ULong>();
+		std::cout << sum1 << std::endl;
+	}
+	std::cout << "main over" << std::endl;
+	getchar();
+#if 0
+	{
+		ThreadPool pool;
 
-	//用户自己设置线程池的工作模式
-	pool.setMode(PoolMode::MODE_CACHED);
-	//启动线程池
-	pool.start(4);
+		//用户自己设置线程池的工作模式
+		pool.setMode(PoolMode::MODE_CACHED);
+		//启动线程池
+		pool.start(4);
 
-	Result res1 = pool.submitTask(std::make_shared<MyTask>(1, 10000000));
-	Result res2 = pool.submitTask(std::make_shared<MyTask>(10000001, 20000000));
-	Result res3 = pool.submitTask(std::make_shared<MyTask>(20000001, 30000000));
-	Result res4 = pool.submitTask(std::make_shared<MyTask>(1, 10000000));
-	Result res5 = pool.submitTask(std::make_shared<MyTask>(10000001, 20000000));
-	Result res6 = pool.submitTask(std::make_shared<MyTask>(20000001, 30000000));
+		Result res1 = pool.submitTask(std::make_shared<MyTask>(1, 10000000));
+		Result res2 = pool.submitTask(std::make_shared<MyTask>(10000001, 20000000));
+		Result res3 = pool.submitTask(std::make_shared<MyTask>(20000001, 30000000));
+		Result res4 = pool.submitTask(std::make_shared<MyTask>(1, 10000000));
+		Result res5 = pool.submitTask(std::make_shared<MyTask>(10000001, 20000000));
+		Result res6 = pool.submitTask(std::make_shared<MyTask>(20000001, 30000000));
 
 
-	ULong sum1 = res1.get().cast_<ULong>();
-	ULong sum2 = res2.get().cast_<ULong>();
-	ULong sum3 = res3.get().cast_<ULong>();
+		ULong sum1 = res1.get().cast_<ULong>();
+		ULong sum2 = res2.get().cast_<ULong>();
+		ULong sum3 = res3.get().cast_<ULong>();
 
-	//Master - Salve线程模型
-	//Master线程用来分解任务,然后给各个Salve线程分配任务
-	//等待各个Salve线程完成任务，返回结果
-	//Master线程合并各个任务结果，输出
-	std::cout << (sum1 + sum2 + sum3) << std::endl;
+		//Master - Salve线程模型
+		//Master线程用来分解任务,然后给各个Salve线程分配任务
+		//等待各个Salve线程完成任务，返回结果
+		//Master线程合并各个任务结果，输出
+		std::cout << (sum1 + sum2 + sum3) << std::endl;
 
+	}
 
 	ULong sum = 0;
 	for (ULong i = 1; i <= 30000000; i++)
@@ -97,4 +115,5 @@ int main()
 //	pool.submitTask(std::make_shared<MyTask>());
 
 	getchar();
+#endif
 }
